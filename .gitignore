@@ -1,0 +1,21 @@
+# Environment & secrets
+.env
+*.env
+
+# Airflow
+logs/
+__pycache__/
+*.pyc
+*.pyo
+
+# Data files (generated locally)
+data/*.csv
+
+# Python
+venv/
+.venv/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db

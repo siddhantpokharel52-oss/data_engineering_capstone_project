@@ -1,0 +1,125 @@
+# version: '3.8'
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.9.1
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ${FERNET_KEY}
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__CORE__TEST_CONNECTION: 'Enabled'
+    AIRFLOW__SMTP__SMTP_HOST: smtp.gmail.com
+    AIRFLOW__SMTP__SMTP_PORT: '587'
+    AIRFLOW__SMTP__SMTP_USER: ${SMTP_USER}
+    AIRFLOW__SMTP__SMTP_PASSWORD: ${SMTP_PASSWORD}
+    AIRFLOW__SMTP__SMTP_MAIL_FROM: ${SMTP_USER}
+    AIRFLOW__SMTP__SMTP_SSL: 'false'
+    AIRFLOW__SMTP__SMTP_STARTTLS: 'true'
+    PYTHONPATH: /home/airflow/.local/lib/python3.12/site-packages
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./data:/opt/airflow/data
+    - ./requirements.txt:/requirements.txt
+    - airflow-logs:/opt/airflow/logs
+    - airflow-pip-packages:/home/airflow/.local
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+
+  # ── Postgres metadata DB ───────────────────────────────────────────────────
+  postgres:
+    image: postgres:15
+    container_name: capstone_postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Init — runs once to install packages, migrate DB, create admin user ────
+  airflow-init:
+    <<: *airflow-common
+    container_name: capstone_airflow_init
+    user: root
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        echo "=== Step 1: Fix data folder permissions ==="
+        mkdir -p /opt/airflow/data && chmod 777 /opt/airflow/data
+
+        echo "=== Step 2: Install system build tools ==="
+        apt-get update -qq && \
+        apt-get install -y --no-install-recommends \
+          gcc g++ libffi-dev libssl-dev python3-dev build-essential && \
+        apt-get clean && rm -rf /var/lib/apt/lists/*
+
+        echo "=== Step 3: Install Python packages as airflow user ==="
+        su -c "pip install --upgrade pip --quiet && \
+               pip install -r /requirements.txt --quiet" airflow
+
+        echo "=== Step 4: Initialise Airflow DB ==="
+        su -c "airflow db migrate" airflow
+
+        echo "=== Step 5: Create admin user ==="
+        su -c "airflow users create \
+          --username admin \
+          --password admin \
+          --firstname Siddhant \
+          --lastname Student \
+          --role Admin \
+          --email admin@capstone.com || true" airflow
+
+        echo "=== Init complete! ==="
+    restart: "no"
+
+  # ── Webserver — UI at http://localhost:8080 ────────────────────────────────
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: capstone_webserver
+    command: airflow webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  # ── Scheduler — triggers DAG runs ─────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: capstone_scheduler
+    command: airflow scheduler
+    healthcheck:
+      test: ["CMD", "airflow", "jobs", "check", "--job-type", "SchedulerJob", "--hostname", "$${HOSTNAME}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  postgres-db-volume:
+  airflow-logs:
+  airflow-pip-packages:
