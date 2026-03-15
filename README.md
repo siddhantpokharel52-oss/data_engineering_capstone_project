@@ -282,7 +282,7 @@ Log in to Snowflake as `ACCOUNTADMIN` and run in order:
 -- 05_alerts.sql → Notification Integration + Daily Alert
 -- 06_share.sql  → Secure Share for instructor
 ```
-
+> The Schema is not shared in github.
 > ⚠️ Update email addresses in `05_alerts.sql` before running.
 
 ---
