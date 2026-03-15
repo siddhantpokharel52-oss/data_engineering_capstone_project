@@ -408,6 +408,13 @@ ALTER SHARE MBUST__025_MDS__07
 
 ![Capstone ETL Pipeline](capstion_elt_pipeline.png)
 
+## Success with Email Summary Report
+> daily summary report
+
+![Daily Summary Report](email.png) 
+
+
+
 
 <div align="center">
 
