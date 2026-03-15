@@ -403,6 +403,12 @@ ALTER SHARE MBUST__025_MDS__07
 
 ---
 
+## Air Flow Success Diagram
+> (DAG) capstone_etl_pipeline 
+
+![Capstone ETL Pipeline](capstion_elt_pipeline.png)
+
+
 <div align="center">
 
 **MBUST__025_MDS__07 · Snowflake · Apache Airflow · Docker**
